@@ -134,7 +134,7 @@ def identity_map(key, needed):
     """user_id -> (name, email) from the audit log; stop once all found."""
     idmap, cursor = {}, None
     while True:
-        url = AUDIT + "?limit=500" + (f"&cursor={urllib.parse.quote(cursor)}" if cursor else "")
+        url = AUDIT + "?limit=500" + (f"&cursor={urllib.parse.quote(str(cursor))}" if cursor else "")
         d = _get(url, key)
         for t in d.get("trails", []):
             data = t.get("data", {})
