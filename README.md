@@ -1,5 +1,5 @@
 # Postman-User-Report
-**This script will generate a team report, showing each user, their name, email, 
+This script will generate a team report, showing each user, their name, email, 
 how many workspaces and collections they've created, how many workspaces and collections they're active in (measured by requests sent),
 how many API requests they've sent in the last 30 days, and when they were last active.
 
