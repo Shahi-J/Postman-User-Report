@@ -4,7 +4,7 @@ how many workspaces and collections they've created, how many workspaces and col
 how many API requests they've sent in the last 30 days, and when they were last active.
 
 ## How it works
-The script pulls the activity from Postman's Analytics API, which only identifies users by an internal ID, then uses the Audit Log to match each ID back to a real name and email. It joins the two together and writes out one row per user.
+The script pulls the activity from Postman's Analytics API for detailed usage, this identifies users by an internal ID, it then uses the Audit Log to match each ID back to a real name and email. It joins the two together and writes out one row per user.
 
 ## Before you start
 - These steps are for macOS.
