@@ -48,4 +48,4 @@ Double-click it to open in Excel or Numbers.
 
 ## Endpoint Documentation
 - Analytics API: https://learning.postman.com/api-docs/api-reference/analytics/get-analytics-data
-- Audit Logs: https://learning.postman.com/docs/administration/managing-your-team/audit-logs/
+- Audit Logs API: https://learning.postman.com/docs/administration/managing-your-team/audit-logs/
