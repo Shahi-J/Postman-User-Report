@@ -4,7 +4,7 @@ Combined per-user persona report: one row per user with their footprint and
 activity, names and emails attached.
 
 Output CSV columns:
-  user_id, user_name, email,
+  user_id, user_name, email, user_role,
   workspaces_created, collections_created,      # objects they created (active)
   workspaces_active_in, collections_active_in,  # distinct ones they've used
   api_requests_count, last_active
@@ -15,6 +15,7 @@ Sources (VERIFIED live against Postman Analytics + Audit APIs, July 2026):
   analytics workspace/active_workspaces (30d, detailed) -> created_by (=user id)
   analytics workspace/active_collections(30d, detailed) -> created_by (=user id)
   analytics workspace/user_requests   (180d, detailed) -> user_id, workspace_id, collection_id
+  analytics team/members              (detailed) -> user_role, matched on email
   audit/logs                                 -> user id -> name + email
 
 Honest limits:
@@ -151,21 +152,37 @@ def identity_map(key, needed):
             return idmap
 
 
-HEADER = ["user_id", "user_name", "email", "workspaces_created",
+def roles_by_email(key):
+    """email (lowercased) -> role string, from the team member list."""
+    out = {}
+    for cols, rows in _pages({"resource": "team", "metrics": "members",
+                              "view": "detailed"}, key):
+        if "email" not in cols or "user_role" not in cols:
+            continue
+        ei, ri = cols.index("email"), cols.index("user_role")
+        for r in rows:
+            email = (r[ei] or "").strip().lower()
+            if email:
+                out[email] = r[ri]
+    return out
+
+
+HEADER = ["user_id", "user_name", "email", "user_role", "workspaces_created",
           "collections_created", "workspaces_active_in", "collections_active_in",
           "api_requests_count", "last_active"]
 
 
-def build(act, ws_made, coll_made, ws_act, coll_act, idmap):
+def build(act, ws_made, coll_made, ws_act, coll_act, idmap, roles):
     rows = []
     for uid in set(act) | set(ws_made) | set(coll_made) | set(ws_act) | set(coll_act):
         name, email = idmap.get(uid, ("", ""))
+        role = roles.get(email.strip().lower(), "") if email else ""
         reqs, last = act.get(uid, (0, ""))
-        rows.append([uid, name, email,
+        rows.append([uid, name, email, role,
                      ws_made.get(uid, 0), coll_made.get(uid, 0),
                      len(ws_act.get(uid, set())), len(coll_act.get(uid, set())),
                      reqs, last])
-    rows.sort(key=lambda r: (r[7], r[3] + r[4] + r[5] + r[6]), reverse=True)
+    rows.sort(key=lambda r: (r[8], r[4] + r[5] + r[6] + r[7]), reverse=True)
     return HEADER, rows
 
 
@@ -176,11 +193,12 @@ def selftest():
     ws_act = {"1": {"a", "b", "c"}, "2": {"a"}}
     coll_act = {"1": {"x", "y"}}
     idmap = {"1": ("Alice", "a@x.com"), "2": ("Bob", "b@x.com")}  # 3 missing
-    header, rows = build(act, ws_made, coll_made, ws_act, coll_act, idmap)
+    roles = {"a@x.com": "Admin", "b@x.com": "Developer"}
+    header, rows = build(act, ws_made, coll_made, ws_act, coll_act, idmap, roles)
     assert header == HEADER
-    assert rows[0] == ["1", "Alice", "a@x.com", 2, 12, 3, 2, 50, "2026-07-20"], rows[0]
+    assert rows[0] == ["1", "Alice", "a@x.com", "Admin", 2, 12, 3, 2, 50, "2026-07-20"], rows[0]
     r3 = [r for r in rows if r[0] == "3"][0]
-    assert r3 == ["3", "", "", 4, 0, 0, 0, 0, ""], r3
+    assert r3 == ["3", "", "", "", 4, 0, 0, 0, 0, ""], r3
     print("selftest ok")
 
 
@@ -196,6 +214,7 @@ if __name__ == "__main__":
         ws_made = creator_counts("active_workspaces", api_key)
         coll_made = creator_counts("active_collections", api_key)
         ws_act, coll_act = active_in(api_key)
+        roles = roles_by_email(api_key)
         needed = set(act) | set(ws_made) | set(coll_made) | set(ws_act) | set(coll_act)
         idmap = identity_map(api_key, needed)
     except urllib.error.HTTPError as e:
@@ -206,7 +225,7 @@ if __name__ == "__main__":
         sys.exit(f"Postman returned HTTP {e.code}. Usually the key isn't an "
                  f"admin's, or the team lacks Enterprise/Analytics access.\n"
                  f"Postman said: {reason}")
-    header, rows = build(act, ws_made, coll_made, ws_act, coll_act, idmap)
+    header, rows = build(act, ws_made, coll_made, ws_act, coll_act, idmap, roles)
     w = csv.writer(sys.stdout)
     w.writerow(header)
     w.writerows(rows)
